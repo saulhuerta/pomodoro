@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pomodoro Web App</title>
+    <style>
+        :root {
+            --bg: #0A0A0A;
+            --card: #1C1C1E;
+            --accent: #5D5FEF;
+            --text: #FFFFFF;
+            --subtext: #8E8E93;
+            --font-main: -apple-system, system-ui, sans-serif;
+            --font-mono: "Courier New", Courier, monospace;
+        }
+
+        body.theme-matrix {
+            --bg: #000000;
+            --accent: #00ff41;
+        }
+
+        body.theme-vaporwave {
+            --bg: #1a0633;
+            --accent: #ff00ff;
+            --card: #2d0b5a;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: var(--font-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            transition: background 0.8s ease;
+        }
+
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 1s;
+        }
+
+        body.theme-matrix #bg-canvas {
+            opacity: 0.35;
+        }
+
+        body.theme-vaporwave #bg-canvas {
+            opacity: 0.45;
+        }
+
+        .app {
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            padding: 20px;
+            z-index: 10;
+            position: relative;
+        }
+
+        .modes {
+            display: flex;
+            background: var(--card);
+            border-radius: 12px;
+            padding: 4px;
+            margin-bottom: 40px;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            background: transparent;
+            color: var(--subtext);
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: 0.3s;
+        }
+
+        .mode-btn.active {
+            background: #2C2C2E;
+            color: var(--text);
+        }
+
+        body.theme-matrix .mode-btn {
+            font-family: var(--font-mono);
+        }
+
+        .timer-container {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 50px;
+        }
+
+        .progress-ring {
+            transform: rotate(-90deg);
+        }
+
+        .progress-ring__circle {
+            transition: stroke-dashoffset 0.3s, stroke 1s;
+            stroke-linecap: round;
+            filter: drop-shadow(0 0 12px var(--accent));
+        }
+
+        #timer-numbers {
+            font-size: 80px;
+            font-weight: 200;
+            line-height: 1;
+            position: relative;
+        }
+
+        body.theme-matrix #timer-numbers {
+            font-family: var(--font-mono);
+            font-weight: 100;
+            color: #00ff41;
+        }
+
+        body.theme-vaporwave #timer-numbers {
+            font-weight: 900;
+            color: #00f3ff;
+            text-shadow: 3px 3px 0px #ff00ff;
+        }
+
+        .play-btn {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: none;
+            background: var(--text);
+            font-size: 28px;
+            cursor: pointer;
+        }
+
+        #notification {
+            position: fixed;
+            bottom: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 15px 30px;
+            border-radius: 15px;
+            background: var(--card);
+            border: 2px solid var(--accent);
+            z-index: 1000;
+            transition: bottom 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            min-width: 280px;
+        }
+
+        #notification.show {
+            bottom: 40px;
+        }
+
+        #settings-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.92);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-content {
+            background: var(--card);
+            border-radius: 24px;
+            padding: 35px;
+            width: 320px;
+            border: 1px solid #333;
+        }
+
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        /* Ajuste de tamaño igualado solicitado */
+        select,
+        input {
+            background: #2C2C2E;
+            border: 1px solid #444;
+            padding: 10px;
+            color: white;
+            border-radius: 8px;
+            width: 140px;
+            /* Tamaño extendido e igualado */
+            box-sizing: border-box;
+            font-size: 13px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <canvas id="bg-canvas"></canvas>
+
+    <div class="app">
+        <header style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px;">
+            <div id="logo" style="font-weight:bold; letter-spacing:2px; font-size: 14px;">P O M O D O R O _ W E B</div>
+            <button onclick="toggleSettings()"
+                style="background:none; border:none; cursor:pointer; font-size:20px; color:var(--subtext)">⚙️</button>
+        </header>
+
+        <div class="modes">
+            <button id="btn-focus" class="mode-btn active" onclick="setMode('focus', this)">FOCUS</button>
+            <button id="btn-short" class="mode-btn" onclick="setMode('short', this)">BREAK</button>
+            <button id="btn-long" class="mode-btn" onclick="setMode('long', this)">LONG</button>
+        </div>
+
+        <div class="timer-container">
+            <svg class="progress-ring" width="300" height="300">
+                <circle stroke="rgba(255,255,255,0.05)" stroke-width="8" fill="transparent" r="140" cx="150" cy="150" />
+                <circle id="progress-bar" stroke="var(--accent)" stroke-width="8" fill="transparent" r="140" cx="150"
+                    cy="150" stroke-dasharray="879.64" stroke-dashoffset="0" />
+            </svg>
+            <div style="position:absolute; display:flex; flex-direction:column;">
+                <span id="timer-numbers">50:00</span>
+                <span id="timer-label"
+                    style="font-size:10px; color:var(--subtext); letter-spacing:3px; text-transform:uppercase; margin-top:12px;">Status:
+                    IDLE</span>
+            </div>
+        </div>
+
+        <div style="display:flex; justify-content:center; align-items:center; gap:30px;">
+            <button onclick="resetTimer()"
+                style="background:none; border:none; color:var(--subtext); cursor:pointer; font-size:24px;">↺</button>
+            <button id="main-btn" class="play-btn" onclick="toggleTimer()">▶</button>
+            <div style="width:24px"></div>
+        </div>
+    </div>
+
+    <div id="notification">
+        <span id="noti-icon" style="font-size:24px;">⚡</span>
+        <div>
+            <div id="noti-title" style="font-weight:bold; font-size:14px;">NOTIFICATION:</div>
+            <div id="noti-body" style="font-size:12px; color:var(--subtext);">Time's up!</div>
+        </div>
+    </div>
+
+    <div id="settings-modal">
+        <div class="modal-content">
+            <h3 style="margin-top:0; font-size: 18px; margin-bottom: 25px;">Settings</h3>
+            <div class="setting-row">
+                <span style="font-size: 14px;">Visual Theme</span>
+                <select id="theme-select" onchange="changeTheme(this.value)">
+                    <option value="minimal">Minimalist</option>
+                    <option value="matrix">Matrix</option>
+                    <option value="vaporwave">Synthwave</option>
+                </select>
+            </div>
+            <div class="setting-row">
+                <span style="font-size: 14px;">Focus Time (m)</span>
+                <input type="number" id="input-focus" value="50">
+            </div>
+            <button class="play-btn"
+                style="width:100%; height:50px; font-size:14px; border-radius:14px; font-weight:bold; margin-top:10px;"
+                onclick="saveSettings()">SAVE</button>
+        </div>
+    </div>
+
+    <script>
+        let currentMode = 'focus', currentTheme = 'minimal';
+        let vibes = {
+            focus: { min: '#5D5FEF', mat: '#00ff41', vap: '#ff00ff', time: 50, msg: 'Deep Work Session Finished.' },
+            short: { min: '#00D1FF', mat: '#00D1FF', vap: '#00f3ff', time: 5, msg: 'Short break over.' },
+            long: { min: '#FF3B30', mat: '#FF3B30', vap: '#ff0055', time: 15, msg: 'Long break finished.' }
+        };
+
+        let totalTime = vibes.focus.time * 60, timeLeft = totalTime, timer = null;
+        const bar = document.getElementById('progress-bar'), numbers = document.getElementById('timer-numbers'), mainBtn = document.getElementById('main-btn');
+        const canvas = document.getElementById('bg-canvas'), ctx = canvas.getContext('2d');
+        let animationInterval = null, drops = [], columns = 0, gridOffset = 0;
+
+        function initCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            columns = Math.floor(canvas.width / 20);
+            drops = Array(columns).fill(1);
+        }
+
+        function drawMatrix() {
+            ctx.fillStyle = "rgba(0, 0, 0, 0.05)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#00ff41";
+            ctx.font = "15px monospace";
+            for (let i = 0; i < drops.length; i++) {
+                const text = String.fromCharCode(0x30A0 + Math.random() * 96);
+                ctx.fillText(text, i * 20, drops[i] * 20);
+                if (drops[i] * 20 > canvas.height && Math.random() > 0.975) drops[i] = 0;
+                drops[i] += (1 + (1 - (timeLeft / totalTime))) * 0.8;
+            }
+        }
+
+        function drawVaporwave() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = "#ff00ff";
+            ctx.lineWidth = 1;
+            const speed = (1 + (1 - (timeLeft / totalTime))) * 2.5;
+            gridOffset = (gridOffset + speed) % 40;
+            for (let i = 0; i < canvas.width; i += 40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke(); }
+            for (let i = 0; i < canvas.height; i += 40) { ctx.beginPath(); ctx.moveTo(0, i + gridOffset); ctx.lineTo(canvas.width, i + gridOffset); ctx.stroke(); }
+        }
+
+        function runAnimation() {
+            if (currentTheme === 'matrix') drawMatrix();
+            else if (currentTheme === 'vaporwave') drawVaporwave();
+        }
+
+        function updateUI() {
+            const mins = Math.floor(Math.max(0, timeLeft) / 60), secs = Math.max(0, timeLeft) % 60;
+            numbers.textContent = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+            bar.style.strokeDashoffset = 879.64 - (timeLeft / totalTime) * 879.64;
+
+            const label = document.getElementById('timer-label');
+            if (!timer && timeLeft === totalTime) label.textContent = "Status: IDLE";
+            else if (!timer && timeLeft < totalTime) label.textContent = "Status: PAUSED";
+            else label.textContent = currentMode === 'focus' ? "Status: DEEP WORK" : "Status: RECHARGING";
+        }
+
+        function changeTheme(theme, save = true) {
+            clearInterval(animationInterval);
+            animationInterval = null;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            currentTheme = theme;
+            document.body.className = `theme-${theme}`;
+            document.getElementById('theme-select').value = theme;
+            const color = currentTheme === 'minimal' ? vibes[currentMode].min : (currentTheme === 'matrix' ? vibes[currentMode].mat : vibes[currentMode].vap);
+            document.documentElement.style.setProperty('--accent', color);
+            if (save) saveToStorage();
+            if (timer && currentTheme !== 'minimal') animationInterval = setInterval(runAnimation, 33);
+            updateUI();
+        }
+
+        function toggleTimer() {
+            if (timer) {
+                clearInterval(timer); timer = null; mainBtn.textContent = '▶';
+                clearInterval(animationInterval); animationInterval = null;
+            } else {
+                mainBtn.textContent = 'II';
+                timer = setInterval(() => {
+                    if (timeLeft > 0) { timeLeft--; updateUI(); }
+                    else { clearInterval(timer); timer = null; showNotification(); resetTimer(); }
+                }, 1000);
+                if (currentTheme !== 'minimal') animationInterval = setInterval(runAnimation, 33);
+            }
+            updateUI();
+        }
+
+        function showNotification() {
+            const noti = document.getElementById('notification');
+            document.getElementById('noti-body').textContent = vibes[currentMode].msg;
+            noti.classList.add('show');
+            setTimeout(() => noti.classList.remove('show'), 4000);
+        }
+
+        function setMode(mode, btn) {
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentMode = mode;
+            totalTime = vibes[mode].time * 60;
+            timeLeft = totalTime;
+            resetTimer();
+            changeTheme(currentTheme, false);
+        }
+
+        function resetTimer() {
+            clearInterval(timer); timer = null; mainBtn.textContent = '▶';
+            timeLeft = totalTime;
+            clearInterval(animationInterval); animationInterval = null;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            updateUI();
+        }
+
+        function toggleSettings() {
+            const s = document.getElementById('settings-modal');
+            s.style.display = s.style.display === 'flex' ? 'none' : 'flex';
+        }
+
+        function saveSettings() {
+            const newFocus = parseInt(document.getElementById('input-focus').value) || 50;
+            vibes.focus.time = newFocus;
+            saveToStorage();
+            if (currentMode === 'focus') { totalTime = newFocus * 60; timeLeft = totalTime; }
+            toggleSettings(); resetTimer();
+        }
+
+        function saveToStorage() {
+            const config = { focusTime: vibes.focus.time, theme: currentTheme };
+            localStorage.setItem('omni_v4_config', JSON.stringify(config));
+        }
+
+        function loadFromStorage() {
+            const saved = localStorage.getItem('omni_v4_config');
+            if (saved) {
+                const config = JSON.parse(saved);
+                vibes.focus.time = config.focusTime;
+                document.getElementById('input-focus').value = config.focusTime;
+                currentTheme = config.theme;
+                totalTime = (currentMode === 'focus' ? config.focusTime : vibes[currentMode].time) * 60;
+            } else {
+                vibes.focus.time = 50;
+                document.getElementById('input-focus').value = 50;
+                totalTime = 50 * 60;
+            }
+            timeLeft = totalTime;
+            changeTheme(currentTheme, false);
+        }
+
+        window.addEventListener('resize', initCanvas);
+        window.onload = () => { initCanvas(); loadFromStorage(); };
+    </script>
+</body>
+
+</html>
