@@ -340,7 +340,7 @@
                     timeLeft = (endTime - now) / 1000;
                     if (timeLeft <= 0) {
                         timeLeft = 0; clearInterval(timerId); timerId = null;
-                        (); resetTimer();
+                        showNotification(); resetTimer();
                     }
                     updateUI();
                 }, 100); // Revisamos 10 veces por segundo para fluidez, pero basado en Date.now()
@@ -409,12 +409,14 @@
         }
 
         function showNotification() {
+
             const noti = document.getElementById('notification');
             document.getElementById('noti-body').textContent = vibes[currentMode].msg;
-            
+            noti.classList.add('show'); setTimeout(() => noti.classList.remove('show'), 4000);
+
             // Reproducir sonido con manejo de promesa para evitar errores de políticas de navegador
             notifySound.play().catch(e => console.warn("Audio playback prevented by browser settings. User interaction required."));
-            
+
             noti.classList.add('show'); 
             setTimeout(() => noti.classList.remove('show'), 4000);
         }
