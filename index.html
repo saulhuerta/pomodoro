@@ -412,6 +412,7 @@
             const noti = document.getElementById('notification');
             document.getElementById('noti-body').textContent = vibes[currentMode].msg;
             noti.classList.add('show'); setTimeout(() => noti.classList.remove('show'), 4000);
+            notifySound.currentTime = 0; notifySound.play();
         }
 
         window.addEventListener('resize', initCanvas);
